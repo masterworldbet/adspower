@@ -17,7 +17,6 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
-      - run: npm run test:browser
       - name: Build Windows portable package
         run: npm run package:portable
       - name: Upload portable application
@@ -28,6 +27,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Packaged desktop smoke test
+        timeout-minutes: 2
         shell: pwsh
         run: |
           $process = Start-Process -FilePath 'release/win-unpacked/MasterBrowser.exe' -ArgumentList '--smoke-test' -PassThru -Wait
@@ -41,3 +41,25 @@ jobs:
           path: release/*.exe
           if-no-files-found: error
           retention-days: 14
+
+  browser-validation:
+    name: Browser tests (${{ matrix.browser }})
+    runs-on: windows-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
+    env:
+      BROWSER_TEST_ENGINE: ${{ matrix.browser }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install ${{ matrix.browser }}
+      - name: Verify browser session isolation
+        timeout-minutes: 2
+        run: npm run test:browser

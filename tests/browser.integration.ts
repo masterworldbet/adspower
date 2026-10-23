@@ -5,6 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createServer } from "node:http";
+import { reserveProfile } from "../electron/profile-lock.js";
 const engine =
   process.env.BROWSER_TEST_ENGINE === "firefox" ? firefox : chromium;
 test(`${engine.name()} persistent browser profiles isolate cookies and local storage`, async () => {
@@ -52,10 +53,13 @@ test(`${engine.name()} persistent browser profiles isolate cookies and local sto
       null,
     );
     assert.equal(await second.evaluate(() => document.cookie), "");
-    await assert.rejects(() =>
-      engine.launchPersistentContext(path.join(root, "one"), {
-        headless: true,
-      }),
+    // Verify the application's guard rather than relying on engine-specific
+    // behavior when two processes are given the same profile directory.
+    const live = new Map([["one", one]]);
+    const opening = new Set<string>();
+    assert.throws(
+      () => reserveProfile("one", live, opening),
+      /โปรไฟล์เปิดอยู่แล้ว/,
     );
     await one.close();
     const reopened = await engine.launchPersistentContext(
@@ -71,8 +75,20 @@ test(`${engine.name()} persistent browser profiles isolate cookies and local sto
     );
     assert.equal(await persisted.evaluate(() => document.cookie), "owner=one");
   } finally {
-    await Promise.all(contexts.map((c) => c.close()));
-    await new Promise<void>((r) => server.close(() => r()));
-    await rm(root, { recursive: true, force: true });
+    try {
+      await Promise.all(contexts.map((c) => c.close()));
+    } finally {
+      // Browser HTTP keep-alive connections must not keep the test runner alive.
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+      await rm(root, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 200,
+      });
+    }
   }
 });

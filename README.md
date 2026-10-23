@@ -60,7 +60,7 @@ Backup ใน UI **ไม่รวม Session หรือ Proxy Credentials** R
 
 ## สถานะการตรวจในคลาวด์
 
-ผ่าน Typecheck, ESLint, Build, Unit Tests 13 รายการ (รวม VPN output/selection, Proxy Import ที่ปฏิเสธ path/query, hostname validation และ SQLite migration ที่ไม่ downgrade ฐานข้อมูลรุ่นใหม่กว่า) และ HTTP smoke ของ Vite
+ผ่าน Typecheck, ESLint, Build, Unit Tests 14 รายการ (รวม VPN output/selection, Proxy Import ที่ปฏิเสธ path/query, hostname validation และ SQLite migration ที่ไม่ downgrade ฐานข้อมูลรุ่นใหม่กว่า) และ HTTP smoke ของ Vite
 
 ทดสอบ Firefox 157 จริงแบบ headless ผ่าน: Cookies/Local Storage แยกสองโปรไฟล์, เปิด userDataDir เดิมซ้ำถูกปฏิเสธ และข้อมูลคงอยู่หลังปิด/เปิดใหม่ รวมทั้งยืนยัน Locale th-TH, Timezone Asia/Bangkok, Viewport และ Screen 1280px จริง คำสั่งในคลาวด์:
 
@@ -109,3 +109,5 @@ Unit Tests ของ VPN ตรวจ parser และการเลือก C
 เปิด https://github.com/masterworldbet/adspower/actions แล้วเลือกรายการล่าสุดของ **Build MasterBrowser for Windows** รอขั้นตอน Upload portable application สำเร็จ จากนั้นเลื่อนลงไปที่ **Artifacts** และกด **MasterBrowser-Windows-Portable** (ต้องล็อกอิน GitHub และมีสิทธิ์เข้าถึง repository)
 
 แตก ZIP ทั้งหมดและเปิด MasterBrowser.exe จากโฟลเดอร์ที่แตกไฟล์ ส่วน MasterBrowser-Windows-Installer จะปรากฏหลัง Desktop smoke test และการสร้างตัวติดตั้งผ่านแล้ว ไฟล์ Artifacts เก็บ 14 วัน สามารถกด Run workflow เพื่อสร้างใหม่ได้ หาก workflow ล้มเหลวให้ดูขั้นตอนที่เป็นสีแดงก่อนถือว่าโปรแกรมผ่านการตรวจสอบ
+
+การทดสอบ Browser กำหนดเวลาสูงสุด 60 วินาที ปิด HTTP connections หลังทดสอบ และตรวจตัวป้องกันการเปิดโปรไฟล์ซ้ำของแอปโดยตรง GitHub Actions แยก Browser validation (Chromium/Firefox) จากงานสร้างแพ็กเกจ แต่ยังรายงานผลทดสอบที่ล้มเหลวตามจริง

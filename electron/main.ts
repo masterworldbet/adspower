@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, firefox, request, type BrowserContext } from "playwright";
 import { z } from "zod";
 import { vpnStatus as vpn, changeVpn } from "./vpn.js";
+import { reserveProfile } from "./profile-lock.js";
 import { parseProxyList } from "./proxy-import.js";
 import { profileSchema, proxySchema, idSchema, chooseProxy } from "./schema.js";
 const smoke = process.argv.includes("--smoke-test");
@@ -124,8 +125,7 @@ app.whenReady().then(() => {
     },
     "profile.open": async (v) => {
       const id = idSchema.parse(v);
-      if (live.has(id) || opening.has(id)) throw Error("โปรไฟล์เปิดอยู่แล้ว");
-      opening.add(id);
+      reserveProfile(id, live, opening);
       let ctx: BrowserContext | undefined;
       try {
         const p = get("profiles", id);
