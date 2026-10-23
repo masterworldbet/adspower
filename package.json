@@ -1,6 +1,6 @@
 {
   "name": "masterbrowser",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "main": "dist-electron/main.js",
@@ -47,7 +47,16 @@
     },
     "directories": {
       "output": "release"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "browser-binaries",
+        "to": "browsers",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
   },
   "description": "Local desktop browser profile manager",
   "author": "MasterBrowser"

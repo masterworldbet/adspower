@@ -13,7 +13,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install chromium firefox
+      - name: Install bundled Windows browsers
+        run: npx playwright install chromium firefox
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/browser-binaries
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
@@ -27,7 +30,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Packaged desktop smoke test
-        timeout-minutes: 2
+        timeout-minutes: 3
         shell: pwsh
         run: |
           $process = Start-Process -FilePath 'release/win-unpacked/MasterBrowser.exe' -ArgumentList '--smoke-test' -PassThru -Wait

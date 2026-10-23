@@ -23,7 +23,11 @@ const defaults = {
 };
 function App() {
   const [page, setPage] = useState("Facebook Profiles"),
-    [data, setData] = useState<{ profiles: Item[]; proxies: Item[] }>({
+    [data, setData] = useState<{
+      profiles: Item[];
+      proxies: Item[];
+      appVersion?: string;
+    }>({
       profiles: [],
       proxies: [],
     }),
@@ -97,7 +101,7 @@ function App() {
         <footer>
           ข้อมูลอยู่บนเครื่องของคุณ
           <br />
-          Windows 10 / 11
+          Windows 10 / 11 <small>MasterBrowser {data.appVersion || ""}</small>
         </footer>
       </aside>
       <main>
@@ -440,12 +444,14 @@ function App() {
             <h2>เบราว์เซอร์บนเครื่อง</h2>
             {browsers.map((b) => (
               <article key={b.engine}>
-                {b.engine} · {b.available ? "พบ Binary" : "ยังไม่พบ Binary"}
+                {b.name || b.engine} ·{" "}
+                {b.available ? "พร้อมใช้งาน" : "ไม่พร้อมใช้งาน"}
+                <small>{b.available ? b.path : b.reason}</small>
               </article>
             ))}
             <p>
-              Chromium / Firefox ต้องติดตั้งด้วย npx playwright install chromium
-              firefox
+              รุ่น 0.3.0 รวม Chromium / Firefox มาในโปรแกรมแล้ว กรุณาแตก ZIP
+              ทั้งหมดให้ครบ
               <br />
               Chrome / Edge ใช้ที่ติดตั้งบน Windows
             </p>

@@ -12,7 +12,7 @@ npx playwright install chromium firefox
 npm run desktop
 ```
 
-Chrome / Edge ใช้ Binary ที่ติดตั้งบนเครื่อง ส่วน Chromium / Firefox ใช้ Binary ของ Playwright ไม่มีการดาวน์โหลดเบราว์เซอร์ให้อัตโนมัติเมื่อเปิดโปรไฟล์
+Chrome / Edge ใช้ Binary ที่ติดตั้งบนเครื่อง ส่วน Chromium / Firefox ใช้ Binary ของ Playwright รุ่น 0.3.0 ของแพ็กเกจ Windows รวม Binary ไว้ที่ resources/browsers แล้ว ไม่ต้องติดตั้ง Node.js เพื่อใช้ไฟล์ส่งมอบ
 
 ```powershell
 npm run typecheck
@@ -111,3 +111,20 @@ Unit Tests ของ VPN ตรวจ parser และการเลือก C
 แตก ZIP ทั้งหมดและเปิด MasterBrowser.exe จากโฟลเดอร์ที่แตกไฟล์ ส่วน MasterBrowser-Windows-Installer จะปรากฏหลัง Desktop smoke test และการสร้างตัวติดตั้งผ่านแล้ว ไฟล์ Artifacts เก็บ 14 วัน สามารถกด Run workflow เพื่อสร้างใหม่ได้ หาก workflow ล้มเหลวให้ดูขั้นตอนที่เป็นสีแดงก่อนถือว่าโปรแกรมผ่านการตรวจสอบ
 
 การทดสอบ Browser กำหนดเวลาสูงสุด 60 วินาที ปิด HTTP connections หลังทดสอบ และตรวจตัวป้องกันการเปิดโปรไฟล์ซ้ำของแอปโดยตรง GitHub Actions แยก Browser validation (Chromium/Firefox) จากงานสร้างแพ็กเกจ แต่ยังรายงานผลทดสอบที่ล้มเหลวตามจริง
+
+## รุ่น 0.3.0 — Browser ที่พร้อมใช้งานในแพ็กเกจ
+
+แพ็กเกจ Windows รวม Chromium และ Firefox แล้ว แตกไฟล์ทั้งหมดรวม resources/browsers ก่อนเปิดแอป Chrome/Edge ใช้ Binary ที่ติดตั้งบนเครื่อง โดยค้นหา Program Files, Program Files (x86), ProgramW6432 และ LocalAppData แล้วเปิดด้วย executablePath ที่พบจริง หากไม่พบจะแจ้งชื่อเบราว์เซอร์และวิธีแก้ก่อนเริ่มตรวจเครือข่าย
+
+Browser Settings แสดงสถานะและตำแหน่ง Binary ข้อผิดพลาดการเปิดโปรไฟล์แยกช่วง configuration, IP preflight, browser startup และ Facebook navigation และไม่แสดง raw error ที่อาจมีข้อมูลรับรอง Proxy
+
+ก่อนสร้างแพ็กเกจเองบน Windows ให้ติดตั้ง Binary ลงโฟลเดอร์ที่จะรวมในแพ็กเกจ:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH = "$PWD/browser-binaries"
+npx playwright install chromium firefox
+npm run package:portable
+npm run package:win
+```
+
+CI ทำขั้นตอนนี้ก่อนแพ็ก และ smoke test เปิด Chromium/Firefox จากแพ็กเกจจริง รวมทั้ง Chrome/Edge ที่ตรวจพบใน Windows runner กับหน้าในเครื่อง ไม่เปิดบัญชี Facebook ระหว่างทดสอบ

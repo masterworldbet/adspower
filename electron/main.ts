@@ -2,23 +2,42 @@ import { app, BrowserWindow, ipcMain, safeStorage, dialog } from "electron";
 import type { DatabaseSync } from "node:sqlite";
 import { openDatabase } from "./storage.js";
 import { randomUUID } from "node:crypto";
-import {
-  mkdirSync,
-  existsSync,
-  readFileSync,
-  writeFileSync,
-  mkdtempSync,
-} from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
-import { chromium, firefox, request, type BrowserContext } from "playwright";
+import type { BrowserContext } from "playwright";
+import {
+  browserNames,
+  findWindowsBrowser,
+  requireExecutable,
+  launchFailure,
+  type Engine,
+  type LaunchStage,
+} from "./browsers.js";
 import { z } from "zod";
 import { vpnStatus as vpn, changeVpn } from "./vpn.js";
 import { reserveProfile } from "./profile-lock.js";
 import { parseProxyList } from "./proxy-import.js";
 import { profileSchema, proxySchema, idSchema, chooseProxy } from "./schema.js";
+// Resolve bundled browser binaries before Playwright initializes its registry.
+if (app.isPackaged)
+  process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(
+    process.resourcesPath,
+    "browsers",
+  );
+const { chromium, firefox, request } = await import("playwright");
+function executable(engine: Engine) {
+  return requireExecutable(
+    engine,
+    engine === "chrome" || engine === "msedge"
+      ? findWindowsBrowser(engine)
+      : engine === "firefox"
+        ? firefox.executablePath()
+        : chromium.executablePath(),
+  );
+}
 const smoke = process.argv.includes("--smoke-test");
 if (smoke)
   app.setPath(
@@ -73,7 +92,7 @@ async function checkProxy(p: any) {
     await ctx.dispose();
   }
 }
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   root = app.getPath("userData");
   mkdirSync(root, { recursive: true });
   db = openDatabase(path.join(root, "masterbrowser.sqlite"));
@@ -92,6 +111,7 @@ app.whenReady().then(() => {
         hasPassword: !!_secret,
       })),
       platform: process.platform,
+      appVersion: app.getVersion(),
     }),
     "profile.save": (v) => {
       const input = z
@@ -127,8 +147,12 @@ app.whenReady().then(() => {
       const id = idSchema.parse(v);
       reserveProfile(id, live, opening);
       let ctx: BrowserContext | undefined;
+      let stage: LaunchStage = "configuration";
+      let engine: Engine = "chromium";
       try {
         const p = get("profiles", id);
+        engine = p.engine;
+        const executablePath = executable(engine);
         if (p.vpnName) {
           const state = await vpn();
           if (
@@ -147,6 +171,7 @@ app.whenReady().then(() => {
           put("profiles", id, p);
         }
         const proxy = p.proxyId ? get("proxies", p.proxyId) : null;
+        stage = "preflight";
         if (proxy) {
           try {
             const result = await checkProxy(proxy);
@@ -169,13 +194,12 @@ app.whenReady().then(() => {
             await direct.dispose();
           }
         }
+        stage = "launch";
         ctx = await (
           p.engine === "firefox" ? firefox : chromium
         ).launchPersistentContext(path.join(root, "sessions", id), {
           headless: false,
-          channel: ["chrome", "msedge"].includes(p.engine)
-            ? p.engine
-            : undefined,
+          executablePath,
           proxy: proxy ? proxyConfig(proxy) : undefined,
           locale: p.locale,
           timezoneId: p.timezone,
@@ -184,6 +208,7 @@ app.whenReady().then(() => {
         });
         live.set(id, ctx);
         ctx.on("close", () => live.delete(id));
+        stage = "navigation";
         await (ctx.pages()[0] || (await ctx.newPage())).goto(
           "https://www.facebook.com/",
         );
@@ -194,11 +219,9 @@ app.whenReady().then(() => {
           os: process.platform,
         });
         return { version: ctx.browser()?.version() };
-      } catch {
+      } catch (error) {
         await ctx?.close();
-        throw Error(
-          "เปิดเบราว์เซอร์ไม่สำเร็จ: ตรวจ Binary, Proxy และเครือข่าย ไม่มีการสลับเป็น Direct อัตโนมัติ",
-        );
+        throw Error(launchFailure(stage, engine, error));
       } finally {
         opening.delete(id);
       }
@@ -300,31 +323,25 @@ app.whenReady().then(() => {
       await shell.openExternal("ms-settings:network-vpn");
     },
     browsers: () =>
-      ["chromium", "firefox", "chrome", "msedge"].map((engine) => ({
-        engine,
-        available:
-          engine === "chromium"
-            ? existsSync(chromium.executablePath())
-            : engine === "firefox"
-              ? existsSync(firefox.executablePath())
-              : process.platform === "win32" &&
-                [
-                  process.env.PROGRAMFILES,
-                  process.env["PROGRAMFILES(X86)"],
-                  process.env.LOCALAPPDATA,
-                ]
-                  .filter(Boolean)
-                  .some((base) =>
-                    existsSync(
-                      path.join(
-                        base!,
-                        engine === "chrome"
-                          ? "Google/Chrome/Application/chrome.exe"
-                          : "Microsoft/Edge/Application/msedge.exe",
-                      ),
-                    ),
-                  ),
-      })),
+      Object.keys(browserNames).map((key) => {
+        const engine = key as Engine;
+        try {
+          const file = executable(engine);
+          return {
+            engine,
+            name: browserNames[engine],
+            available: true,
+            path: file,
+          };
+        } catch (error) {
+          return {
+            engine,
+            name: browserNames[engine],
+            available: false,
+            reason: error instanceof Error ? error.message : "ไม่พร้อมใช้งาน",
+          };
+        }
+      }),
     backup: async () => {
       const result = await dialog.showSaveDialog({
         defaultPath: "masterbrowser.json",
@@ -408,6 +425,39 @@ app.whenReady().then(() => {
     }
   });
   if (smoke) {
+    try {
+      const engines: Engine[] = [
+        "chromium",
+        "firefox",
+        ...(["chrome", "msedge"] as const).filter(
+          (engine) => !!findWindowsBrowser(engine),
+        ),
+      ];
+      for (const engine of engines) {
+        const context = await (
+          engine === "firefox" ? firefox : chromium
+        ).launchPersistentContext(path.join(root, "smoke-" + engine), {
+          headless: true,
+          executablePath: executable(engine),
+          timeout: 20000,
+        });
+        try {
+          const page = await context.newPage();
+          await page.setContent(
+            "<title>MasterBrowser packaged browser check</title>",
+          );
+          if ((await page.title()) !== "MasterBrowser packaged browser check")
+            throw Error("Browser page failed");
+        } finally {
+          await context.close();
+        }
+        console.log("Packaged browser smoke passed:", engine);
+      }
+    } catch (error) {
+      console.error("Packaged browser smoke test failed:", error);
+      app.exit(1);
+      return;
+    }
     win.webContents.once("did-finish-load", () => {
       void win.webContents
         .executeJavaScript(
