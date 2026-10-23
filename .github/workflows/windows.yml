@@ -1,0 +1,43 @@
+name: Build MasterBrowser for Windows
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium firefox
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:browser
+      - name: Build Windows portable package
+        run: npm run package:portable
+      - name: Upload portable application
+        uses: actions/upload-artifact@v4
+        with:
+          name: MasterBrowser-Windows-Portable
+          path: release/win-unpacked/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Packaged desktop smoke test
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath 'release/win-unpacked/MasterBrowser.exe' -ArgumentList '--smoke-test' -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Desktop smoke test failed: $($process.ExitCode)" }
+      - name: Build Windows installer
+        run: npm run package:win
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: MasterBrowser-Windows-Installer
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 14
