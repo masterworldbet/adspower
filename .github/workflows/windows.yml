@@ -41,6 +41,39 @@ jobs:
           path: release/*.exe
           if-no-files-found: error
           retention-days: 14
+      - name: Upload files for release
+        uses: actions/upload-artifact@v4
+        with:
+          name: MasterBrowser-Release-Files
+          path: |
+            release/*-win.zip
+            release/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-downloads:
+    name: Publish direct downloads
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: [windows, browser-validation]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: MasterBrowser-Release-Files
+          path: artifacts
+      - name: Publish ZIP and installer to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: windows-${{ github.run_number }}-${{ github.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp artifacts/*-win.zip MasterBrowser-Windows.zip
+          cp artifacts/*.exe MasterBrowser-Setup.exe
+          gh release create "$RELEASE_TAG" MasterBrowser-Windows.zip MasterBrowser-Setup.exe --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "MasterBrowser Windows build $GITHUB_RUN_NUMBER" --notes "Windows portable ZIP and installer. Automated checks passed; see the linked commit and workflow for validation details. Extract the entire ZIP before running MasterBrowser.exe." --latest
 
   browser-validation:
     name: Browser tests (${{ matrix.browser }})
