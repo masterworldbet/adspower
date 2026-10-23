@@ -11,9 +11,9 @@
     "lint": "eslint .",
     "test": "tsx --test tests/*.test.ts",
     "desktop": "npm run build && electron .",
-    "package:win": "npm run build && electron-builder --win nsis",
+    "package:win": "npm run build && electron-builder --win nsis --publish never",
     "test:browser": "tsx --test --test-force-exit --test-timeout=60000 tests/browser.integration.ts",
-    "package:portable": "npm run build && electron-builder --win zip"
+    "package:portable": "npm run build && electron-builder --win zip --publish never"
   },
   "dependencies": {
     "playwright": "^1.56.0",
