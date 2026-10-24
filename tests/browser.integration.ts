@@ -5,6 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createServer } from "node:http";
+import { environmentOptions } from "../electron/environment.js";
 import { reserveProfile } from "../electron/profile-lock.js";
 const engine =
   process.env.BROWSER_TEST_ENGINE === "firefox" ? firefox : chromium;
@@ -21,10 +22,19 @@ test(`${engine.name()} persistent browser profiles isolate cookies and local sto
   try {
     const one = await engine.launchPersistentContext(path.join(root, "one"), {
       headless: true,
-      locale: "th-TH",
-      timezoneId: "Asia/Bangkok",
-      viewport: { width: 1280, height: 800 },
-      screen: { width: 1280, height: 800 },
+      ...environmentOptions({
+        locale: "th-TH",
+        timezone: "Asia/Bangkok",
+        width: 1280,
+        height: 800,
+        screenWidth: 1920,
+        screenHeight: 1080,
+        colorScheme: "dark",
+        locationMode: "custom",
+        latitude: 13.75,
+        longitude: 100.5,
+        accuracy: 50,
+      }),
     });
     contexts.push(one);
     const first = await one.newPage();
@@ -37,7 +47,30 @@ test(`${engine.name()} persistent browser profiles isolate cookies and local sto
       "Asia/Bangkok",
     );
     assert.equal(await first.evaluate(() => window.innerWidth), 1280);
-    assert.equal(await first.evaluate(() => window.screen.width), 1280);
+    assert.equal(await first.evaluate(() => window.screen.width), 1920);
+    assert.equal(
+      await first.evaluate(
+        () => matchMedia("(prefers-color-scheme: dark)").matches,
+      ),
+      true,
+    );
+    await one.grantPermissions(["geolocation"], { origin: url });
+    const coords = await first.evaluate(
+      () =>
+        new Promise<{ latitude: number; longitude: number }>(
+          (resolve, reject) =>
+            navigator.geolocation.getCurrentPosition(
+              (p) =>
+                resolve({
+                  latitude: p.coords.latitude,
+                  longitude: p.coords.longitude,
+                }),
+              reject,
+              { timeout: 5000 },
+            ),
+        ),
+    );
+    assert.deepEqual(coords, { latitude: 13.75, longitude: 100.5 });
     await first.evaluate(() => {
       localStorage.setItem("owner", "one");
       document.cookie = "owner=one; Max-Age=86400; SameSite=Lax";

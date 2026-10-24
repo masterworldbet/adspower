@@ -128,3 +128,29 @@ npm run package:win
 ```
 
 CI ทำขั้นตอนนี้ก่อนแพ็ก และ smoke test เปิด Chromium/Firefox จากแพ็กเกจจริง รวมทั้ง Chrome/Edge ที่ตรวจพบใน Windows runner กับหน้าในเครื่อง ไม่เปิดบัญชี Facebook ระหว่างทดสอบ
+
+## รุ่น 0.4.0 — หน้าตั้งค่าโปรไฟล์แบบแท็บ
+
+![Profile settings](docs/profile-editor.png)
+
+แท็บทั่วไป, พร็อกซี / VPN, Facebook, สภาพแวดล้อม และขั้นสูง พร้อมสรุปค่าด้านขวาที่อัปเดตทันที ช่องตั้งค่าที่เปลี่ยนได้เชื่อมกับ Playwright จริง:
+
+- ภาษา/Locale, Timezone, ธีมเว็บไซต์ และ Preset ความละเอียด Windows Desktop
+- Viewport และ Screen แยกกัน โดย Screen ต้องไม่น้อยกว่า Viewport
+- Geolocation ใช้ค่าเบราว์เซอร์, ปิดกั้น หรือกำหนดละติจูด/ลองจิจูดและ accuracy ใช้สิทธิ์เฉพาะ origin ของหน้า Facebook ที่ตั้งไว้ ไม่เปลี่ยน Public IP
+- WebRTC default หรือ disable_non_proxied_udp บน Chromium/Chrome/Edge ตาม browser policy จริง ไม่ใช่ Kill Switch และไม่อ้างว่าป้องกัน leak ได้ทั้งหมด Firefox ปฏิเสธ option นี้อย่างชัดเจน
+- URL เริ่มต้นหลายแท็บ (สูงสุด 10) รองรับเฉพาะ HTTPS บน facebook.com และ subdomain ไม่มี URL ที่ฝัง credentials
+- ชื่อบัญชีสำหรับอ้างอิงเท่านั้น ลงชื่อเข้าใช้ผ่านเบราว์เซอร์ ไม่รับรหัสผ่านหรือคีย์ 2FA ในฟอร์ม
+- ค่าที่ตรวจวัดจาก browser ครั้งล่าสุด เช่น User-Agent แสดงแยกจากค่าที่กำลังตั้ง
+
+OS, GPU, WebGL, WebGPU, Canvas, AudioContext, Fonts และ Media Devices ใช้ค่าจริง/ค่าเริ่มต้นของเครื่อง ไม่มีปุ่มปลอม fingerprint, เติม noise หรือสุ่มข้อมูลฮาร์ดแวร์
+
+ผ่าน Unit Tests 22 รายการ และ UI integration ที่ทดสอบการเปลี่ยนแท็บ/สรุป/ปฏิเสธ URL/บันทึกหลายค่า ในชุด UI test เท่านั้นจะมี IPC fixture เพื่อทดสอบ React โดยไม่แตะบัญชีจริง Production ไม่มี Mock Data อีกชุดทดสอบ Firefox จริงตรวจ Geolocation, Dark theme, Locale, Timezone, Viewport, Screen และ persistent session isolation พร้อมกัน คำสั่ง:
+
+```powershell
+npm test
+npm run test:browser
+npm run test:ui
+```
+
+Windows CI รันทดสอบ Browser และ UI ทั้ง Chromium/Firefox ก่อนเผยแพร่ไฟล์รุ่นใหม่

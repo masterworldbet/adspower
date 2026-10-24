@@ -1,26 +1,6 @@
 import { z } from "zod";
 import { isIP } from "node:net";
-export const profileSchema = z.object({
-  name: z.string().trim().min(1).max(100),
-  engine: z.enum(["chromium", "chrome", "msedge", "firefox"]),
-  locale: z.string().regex(/^[a-z]{2}(-[A-Z]{2})?$/),
-  timezone: z.string().refine((v) => {
-    try {
-      new Intl.DateTimeFormat("en", { timeZone: v });
-      return true;
-    } catch {
-      return false;
-    }
-  }),
-  width: z.number().int().min(640).max(7680),
-  height: z.number().int().min(480).max(4320),
-  notes: z.string().max(4000),
-  tags: z.string().max(500),
-  group: z.string().max(100),
-  proxyId: z.string().uuid().nullable(),
-  randomProxy: z.boolean(),
-  vpnName: z.string().max(200).default(""),
-});
+export { profileSchema } from "./profile-schema.js";
 export const proxySchema = z
   .object({
     name: z.string().min(1).max(100),

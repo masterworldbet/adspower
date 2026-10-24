@@ -1,6 +1,6 @@
 {
   "name": "masterbrowser",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "main": "dist-electron/main.js",
@@ -13,7 +13,8 @@
     "desktop": "npm run build && electron .",
     "package:win": "npm run build && electron-builder --win nsis --publish never",
     "test:browser": "tsx --test --test-force-exit --test-timeout=60000 tests/browser.integration.ts",
-    "package:portable": "npm run build && electron-builder --win zip --publish never"
+    "package:portable": "npm run build && electron-builder --win zip --publish never",
+    "test:ui": "tsx --test --test-force-exit --test-timeout=60000 tests/editor.integration.ts"
   },
   "dependencies": {
     "playwright": "^1.56.0",

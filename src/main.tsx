@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./style.css";
+import { ProfileEditor } from "./ProfileEditor.js";
 type Item = Record<string, any>;
 declare global {
   interface Window {
@@ -27,6 +28,7 @@ function App() {
       profiles: Item[];
       proxies: Item[];
       appVersion?: string;
+      platform?: string;
     }>({
       profiles: [],
       proxies: [],
@@ -46,6 +48,14 @@ function App() {
     const r = await window.masterbrowser.invoke(action, arg);
     if (!r.ok) throw Error(r.error);
     return r.value;
+  }
+  async function loadEditorInfo() {
+    const [connections, installed] = await Promise.all([
+      call("vpn.status"),
+      call("browsers"),
+    ]);
+    setVpn(connections);
+    setBrowsers(installed);
   }
   async function refresh() {
     setData(await call("list"));
@@ -164,7 +174,7 @@ function App() {
                 disabled={busy}
                 onClick={() => {
                   setForm({ ...defaults });
-                  void run(async () => setVpn(await call("vpn.status")));
+                  void run(loadEditorInfo);
                 }}
               >
                 ＋ สร้างโปรไฟล์
@@ -238,9 +248,7 @@ function App() {
                           disabled={busy || p.status !== "stopped"}
                           onClick={() => {
                             setForm({ ...p });
-                            void run(async () =>
-                              setVpn(await call("vpn.status")),
-                            );
+                            void run(loadEditorInfo);
                           }}
                         >
                           แก้ไข
@@ -504,172 +512,31 @@ function App() {
           </section>
         )}
         {form && (
-          <div className="overlay">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void run(async () => {
-                  const {
-                    id,
-                    status,
-                    lastOpened,
-                    ip,
-                    browserVersion,
-                    os,
-                    ...fields
-                  } = form;
-                  void status;
-                  void lastOpened;
-                  void ip;
-                  void browserVersion;
-                  void os;
-                  await call("profile.save", { id, data: fields });
-                  setForm(null);
+          <ProfileEditor
+            key={form.id || "new"}
+            value={form}
+            platform={data.platform}
+            proxies={data.proxies}
+            browsers={browsers}
+            vpn={vpn}
+            busy={busy}
+            error={error}
+            onClose={() => setForm(null)}
+            onSave={(fields) => {
+              void run(async () => {
+                await call("profile.save", {
+                  id: fields.id,
+                  data: {
+                    ...fields,
+                    startUrls: fields.startUrls
+                      .map((v: string) => v.trim())
+                      .filter(Boolean),
+                  },
                 });
-              }}
-            >
-              <h2>{form.id ? "แก้ไข" : "สร้าง"}โปรไฟล์</h2>
-              <div className="fields">
-                {[
-                  ["name", "ชื่อโปรไฟล์"],
-                  ["group", "กลุ่ม"],
-                  ["tags", "แท็ก"],
-                  ["locale", "Locale"],
-                  ["timezone", "Timezone"],
-                  ["width", "ความกว้าง"],
-                  ["height", "ความสูง"],
-                ].map(([key, label]) => (
-                  <label key={key}>
-                    {label}
-                    <input
-                      required
-                      value={form[key]}
-                      type={
-                        ["width", "height"].includes(key) ? "number" : "text"
-                      }
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          [key]: ["width", "height"].includes(key)
-                            ? Number(e.target.value)
-                            : e.target.value,
-                        })
-                      }
-                    />
-                  </label>
-                ))}
-                <label>
-                  Browser
-                  <select
-                    value={form.engine}
-                    onChange={(e) =>
-                      setForm({ ...form, engine: e.target.value })
-                    }
-                  >
-                    {["chromium", "chrome", "msedge", "firefox"].map((x) => (
-                      <option key={x}>{x}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Proxy
-                  <select
-                    value={form.proxyId || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, proxyId: e.target.value || null })
-                    }
-                  >
-                    <option value="">Direct Connection</option>
-                    {data.proxies.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.status})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  VPN ที่ต้องเชื่อมต่อ
-                  <select
-                    value={form.vpnName || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, vpnName: e.target.value })
-                    }
-                  >
-                    <option value="">ไม่กำหนด VPN</option>
-                    {vpn?.connections?.map((v: Item) => (
-                      <option key={v.Name} value={v.Name}>
-                        {v.Name} ({v.ConnectionStatus})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  disabled={!vpn?.connections?.length}
-                  onClick={() => {
-                    const list = vpn!.connections;
-                    setForm({
-                      ...form,
-                      vpnName:
-                        list[Math.floor(Math.random() * list.length)].Name,
-                    });
-                  }}
-                >
-                  สุ่ม VPN ที่ตั้งค่าไว้ (ต้องเชื่อมต่อก่อนเปิด)
-                </button>
-                <label>
-                  หมายเหตุ
-                  <textarea
-                    value={form.notes}
-                    onChange={(e) =>
-                      setForm({ ...form, notes: e.target.value })
-                    }
-                  />
-                </label>
-              </div>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.randomProxy}
-                  onChange={(e) =>
-                    setForm({ ...form, randomProxy: e.target.checked })
-                  }
-                />{" "}
-                สุ่ม Proxy ที่ผ่านการตรวจสอบก่อนเปิดแต่ละครั้ง
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  const available = data.proxies.filter(
-                    (p) => p.status === "available",
-                  );
-                  if (!available.length) {
-                    setError("ไม่มี Proxy ที่ผ่านการทดสอบ");
-                    return;
-                  }
-                  setForm({
-                    ...form,
-                    proxyId:
-                      available[Math.floor(Math.random() * available.length)]
-                        .id,
-                  });
-                }}
-              >
-                สุ่ม Proxy ตอนนี้
-              </button>
-              <p>
-                Environment: {form.engine} · {form.locale} · {form.timezone} ·{" "}
-                {form.width}×{form.height} · OS จริงของเครื่อง
-              </p>
-              <button disabled={busy} type="submit">
-                บันทึก
-              </button>
-              <button type="button" onClick={() => setForm(null)}>
-                ยกเลิก
-              </button>
-              {error && <p className="error">{error}</p>}
-            </form>
-          </div>
+                setForm(null);
+              });
+            }}
+          />
         )}
         {importText !== null && (
           <div className="overlay">

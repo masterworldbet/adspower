@@ -99,3 +99,6 @@ jobs:
       - name: Verify browser session isolation
         timeout-minutes: 2
         run: npm run test:browser
+      - name: Verify profile settings UI
+        timeout-minutes: 2
+        run: npm run test:ui

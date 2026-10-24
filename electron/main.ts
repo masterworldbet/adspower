@@ -18,6 +18,7 @@ import {
 } from "./browsers.js";
 import { z } from "zod";
 import { vpnStatus as vpn, changeVpn } from "./vpn.js";
+import { environmentOptions, startupUrls } from "./environment.js";
 import { reserveProfile } from "./profile-lock.js";
 import { parseProxyList } from "./proxy-import.js";
 import { profileSchema, proxySchema, idSchema, chooseProxy } from "./schema.js";
@@ -121,7 +122,8 @@ app.whenReady().then(async () => {
       if (live.has(id) || opening.has(id))
         throw Error("กรุณาปิดโปรไฟล์ก่อนแก้ไข");
       if (input.data.proxyId) get("proxies", input.data.proxyId);
-      put("profiles", id, input.data);
+      const previous = input.id ? get("profiles", id) : {};
+      put("profiles", id, { ...previous, ...input.data });
       return id;
     },
     "profile.delete": (v) => {
@@ -150,7 +152,8 @@ app.whenReady().then(async () => {
       let stage: LaunchStage = "configuration";
       let engine: Engine = "chromium";
       try {
-        const p = get("profiles", id);
+        const saved = get("profiles", id);
+        const p = { ...saved, ...profileSchema.parse(saved) };
         engine = p.engine;
         const executablePath = executable(engine);
         if (p.vpnName) {
@@ -201,22 +204,45 @@ app.whenReady().then(async () => {
           headless: false,
           executablePath,
           proxy: proxy ? proxyConfig(proxy) : undefined,
-          locale: p.locale,
-          timezoneId: p.timezone,
-          viewport: { width: p.width, height: p.height },
-          screen: { width: p.width, height: p.height },
+          ...environmentOptions(p),
+          args:
+            p.webrtcPolicy === "restrict_udp"
+              ? ["--force-webrtc-ip-handling-policy=disable_non_proxied_udp"]
+              : [],
         });
         live.set(id, ctx);
         ctx.on("close", () => live.delete(id));
+        const origins = new Set([
+          "https://www.facebook.com",
+          ...startupUrls(p.startUrls).map((url) => new URL(url).origin),
+        ]);
+        if (p.locationMode !== "ask")
+          for (const origin of origins)
+            await ctx.grantPermissions(
+              p.locationMode === "custom" ? ["geolocation"] : [],
+              { origin },
+            );
         stage = "navigation";
-        await (ctx.pages()[0] || (await ctx.newPage())).goto(
-          "https://www.facebook.com/",
-        );
+        const pages = startupUrls(p.startUrls);
+        const first = ctx.pages()[0] || (await ctx.newPage());
+        await first.goto(pages[0]!, { waitUntil: "domcontentloaded" });
+        for (const url of pages.slice(1))
+          await (
+            await ctx.newPage()
+          ).goto(url, { waitUntil: "domcontentloaded" });
+        const realEnvironment = await first.evaluate(() => ({
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          screenWidth: screen.width,
+          screenHeight: screen.height,
+        }));
         put("profiles", id, {
           ...p,
           lastOpened: new Date().toISOString(),
           browserVersion: ctx.browser()?.version() || "unknown",
           os: process.platform,
+          realEnvironment,
         });
         return { version: ctx.browser()?.version() };
       } catch (error) {
