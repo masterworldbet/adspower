@@ -20,6 +20,7 @@ export const profileSchema = z
     group: z.string().max(100),
     proxyId: z.string().uuid().nullable(),
     randomProxy: z.boolean(),
+    restoreTabs: z.boolean().default(true),
     vpnName: z.string().max(200).default(""),
     accountLabel: z.string().max(200).default(""),
     screenWidth: z.number().int().min(320).max(7680).optional(),

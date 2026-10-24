@@ -222,6 +222,9 @@ function App() {
                       <td>ไม่ทราบ</td>
                       <td>
                         <span className="badge">{p.status}</span>
+                        {p.sessionNotice && (
+                          <small role="note">{p.sessionNotice}</small>
+                        )}
                       </td>
                       <td>
                         {p.lastOpened
@@ -233,12 +236,13 @@ function App() {
                           disabled={busy}
                           onClick={() =>
                             void run(async () => {
-                              await call(
+                              const result = await call(
                                 p.status === "running"
                                   ? "profile.close"
                                   : "profile.open",
                                 p.id,
                               );
+                              if (result?.warning) setMessage(result.warning);
                             })
                           }
                         >

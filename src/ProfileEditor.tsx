@@ -42,6 +42,7 @@ export function ProfileEditor({
           : "OS จริงของเครื่อง";
   const [form, setForm] = useState<Item>({
     deviceMode: "desktop",
+    restoreTabs: true,
     colorScheme: "system",
     locationMode: "ask",
     accuracy: 100,
@@ -99,7 +100,7 @@ export function ProfileEditor({
         setTab(0);
       else if (["proxyId", "randomProxy", "vpnName"].includes(field)) setTab(1);
       else if (["startUrls", "accountLabel"].includes(field)) setTab(2);
-      else if (field === "webrtcPolicy") setTab(4);
+      else if (["webrtcPolicy", "restoreTabs"].includes(field)) setTab(4);
       else setTab(3);
       setLocalError(`ตรวจค่า ${field}: ${issue.message}`);
       return;
@@ -614,6 +615,21 @@ export function ProfileEditor({
                 ))}
                 <hr />
                 <h3>Session และความปลอดภัย</h3>
+                <label className="check-line">
+                  <input
+                    type="checkbox"
+                    checked={form.restoreTabs}
+                    onChange={(e) => set("restoreTabs", e.target.checked)}
+                  />{" "}
+                  บันทึกและคืนแท็บล่าสุดเมื่อเปิดโปรไฟล์
+                </label>
+                <p className="field-help">
+                  เปิดกลับด้วย URL ของแท็บที่บันทึกไว้แทน URL เริ่มต้น
+                  ไม่เพิ่มแท็บเริ่มต้นซ้ำ
+                  ปิดตัวเลือกนี้เพื่อลบรายการแท็บที่แอปบันทึกไว้และใช้ URL
+                  เริ่มต้นแทน
+                  ไม่รวมข้อความในฟอร์มที่ยังไม่ส่งหรือประวัติปุ่มย้อนกลับ
+                </p>
                 <p>
                   Cookies, Cache และ Local Storage แยกตามโปรไฟล์
                   ป้องกันการเปิดโฟลเดอร์เดิมซ้ำ ไม่มี Cloud Sync หรือการส่ง
@@ -677,6 +693,10 @@ export function ProfileEditor({
                     : "ค่าเบราว์เซอร์",
                 ],
                 ["User-Agent", "อัตโนมัติจากเบราว์เซอร์"],
+                [
+                  "แท็บเมื่อเปิด",
+                  form.restoreTabs ? "คืนแท็บล่าสุด" : "URL เริ่มต้น",
+                ],
                 ["Canvas / GPU", "ค่าจริง"],
                 [
                   "แท็บเริ่มต้น",

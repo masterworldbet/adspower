@@ -174,3 +174,114 @@ for (const mode of ["android", "iphone"] as const) {
     },
   );
 }
+import {
+  TabTracker,
+  saveTabs,
+  loadTabs,
+  restoreTabs,
+  restorableUrl,
+} from "../electron/tabs.js";
+import { openDatabase } from "../electron/storage.js";
+test(`${engine.name()} restores per-profile tabs and persistent storage after restart without duplicates`, async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "masterbrowser-tabs-"));
+  const server = createServer((req, res) => {
+    if (req.url === "/offline") {
+      req.socket.destroy();
+      return;
+    }
+    res.end("<html><title>Tab restoration fixture</title></html>");
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const address = server.address();
+  if (!address || typeof address === "string") throw Error("No server address");
+  const url = `http://127.0.0.1:${address.port}`;
+  const encode = (value: string) => Buffer.from(value).toString("base64"),
+    decode = (value: string) => Buffer.from(value, "base64").toString();
+  const db = openDatabase(path.join(root, "tabs.sqlite"));
+  const contexts = [];
+  try {
+    const context = await engine.launchPersistentContext(
+      path.join(root, "profile"),
+      { headless: true },
+    );
+    contexts.push(context);
+    const first = context.pages()[0] || (await context.newPage());
+    await first.goto(url + "/one");
+    await first.evaluate(() => {
+      localStorage.setItem("owned-session", "kept");
+      document.cookie = "owned=kept; Max-Age=86400; SameSite=Lax";
+    });
+    const second = await context.newPage();
+    await second.goto(url + "/two");
+    const third = await context.newPage();
+    await third.goto(url + "/three");
+    const tracker = new TabTracker(context, (state) =>
+      saveTabs(db, "profile-a", state, encode),
+    );
+    await tracker.flush();
+    await second.close();
+    await tracker.flush();
+    const fourth = await context.newPage();
+    await fourth.goto(url + "/four");
+    await tracker.prepareClose();
+    const saved = loadTabs(db, "profile-a", decode)!;
+    assert.deepEqual(saved.urls, [url + "/one", url + "/three", url + "/four"]);
+    assert.equal(loadTabs(db, "profile-b", decode), undefined);
+    await context.close();
+    const reopened = await engine.launchPersistentContext(
+      path.join(root, "profile"),
+      { headless: true },
+    );
+    contexts.push(reopened);
+    assert.equal(
+      (await restoreTabs(reopened, saved.urls, saved.activeIndex)).failed,
+      0,
+    );
+    assert.deepEqual(
+      reopened
+        .pages()
+        .map((page) => page.url())
+        .filter(restorableUrl),
+      saved.urls,
+    );
+    await restoreTabs(reopened, saved.urls, saved.activeIndex);
+    assert.equal(reopened.pages().length, 3);
+    assert.equal(
+      await reopened
+        .pages()[0]!
+        .evaluate(() => localStorage.getItem("owned-session")),
+      "kept",
+    );
+    assert.ok(
+      (await reopened.cookies()).some(
+        (cookie) => cookie.name === "owned" && cookie.value === "kept",
+      ),
+    );
+    const nativeCloseTracker = new TabTracker(reopened, (state) =>
+      saveTabs(db, "profile-a", state, encode),
+    );
+    await nativeCloseTracker.flush();
+    const before = loadTabs(db, "profile-a", decode);
+    await reopened.close();
+    assert.deepEqual(loadTabs(db, "profile-a", decode), before);
+    const failed = await engine.launchPersistentContext(
+      path.join(root, "failed-page"),
+      { headless: true },
+    );
+    contexts.push(failed);
+    const result = await restoreTabs(failed, [url + "/offline"]);
+    assert.equal(result.failed, 1);
+    assert.ok(failed.pages().some((page) => !page.isClosed()));
+  } finally {
+    await Promise.all(contexts.map((context) => context.close()));
+    db.close();
+    server.closeAllConnections();
+    await new Promise<void>((r) => server.close(() => r()));
+    await rm(root, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 200,
+    });
+  }
+});

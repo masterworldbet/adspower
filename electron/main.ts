@@ -19,6 +19,13 @@ import {
 import { z } from "zod";
 import { vpnStatus as vpn, changeVpn } from "./vpn.js";
 import { environmentOptions, startupUrls } from "./environment.js";
+import {
+  TabTracker,
+  loadTabs,
+  saveTabs,
+  restoreTabs,
+  tabSnapshot,
+} from "./tabs.js";
 import { reserveProfile } from "./profile-lock.js";
 import { parseProxyList } from "./proxy-import.js";
 import { profileSchema, proxySchema, idSchema, chooseProxy } from "./schema.js";
@@ -48,6 +55,20 @@ if (smoke)
 const here = path.dirname(fileURLToPath(import.meta.url));
 const live = new Map<string, BrowserContext>();
 const opening = new Set<string>();
+const tabTrackers = new Map<string, TabTracker>();
+const sessionNotices = new Map<string, string>();
+function encryptTabs(value: string) {
+  if (!safeStorage.isEncryptionAvailable()) throw Error("การเข้ารหัสไม่พร้อม");
+  return safeStorage.encryptString(value).toString("base64");
+}
+function decryptTabs(value: string) {
+  if (!safeStorage.isEncryptionAvailable()) throw Error("การเข้ารหัสไม่พร้อม");
+  return safeStorage.decryptString(Buffer.from(value, "base64"));
+}
+async function closeProfile(id: string) {
+  await tabTrackers.get(id)?.prepareClose();
+  await live.get(id)?.close();
+}
 let db: DatabaseSync;
 let root: string;
 function rows(table: "profiles" | "proxies") {
@@ -101,6 +122,7 @@ app.whenReady().then(async () => {
     list: () => ({
       profiles: rows("profiles").map((p) => ({
         ...p,
+        sessionNotice: sessionNotices.get(p.id),
         status: live.has(p.id)
           ? "running"
           : opening.has(p.id)
@@ -124,11 +146,14 @@ app.whenReady().then(async () => {
       if (input.data.proxyId) get("proxies", input.data.proxyId);
       const previous = input.id ? get("profiles", id) : {};
       put("profiles", id, { ...previous, ...input.data });
+      if (!input.data.restoreTabs)
+        db.prepare("DELETE FROM profile_tabs WHERE profile_id=?").run(id);
       return id;
     },
     "profile.delete": (v) => {
       const id = idSchema.parse(v);
       if (live.has(id) || opening.has(id)) throw Error("โปรไฟล์กำลังทำงาน");
+      db.prepare("DELETE FROM profile_tabs WHERE profile_id=?").run(id);
       db.prepare("DELETE FROM profiles WHERE id=?").run(id);
     },
     "profile.duplicate": (v) => {
@@ -139,11 +164,14 @@ app.whenReady().then(async () => {
         id: undefined,
         lastOpened: undefined,
         ip: undefined,
+        realEnvironment: undefined,
+        browserVersion: undefined,
+        os: undefined,
       });
     },
     "profile.close": async (v) => {
       const id = idSchema.parse(v);
-      await live.get(id)?.close();
+      await closeProfile(id);
     },
     "profile.open": async (v) => {
       const id = idSchema.parse(v);
@@ -151,9 +179,22 @@ app.whenReady().then(async () => {
       let ctx: BrowserContext | undefined;
       let stage: LaunchStage = "configuration";
       let engine: Engine = "chromium";
+      let trackTabs = false;
+      sessionNotices.delete(id);
       try {
         const saved = get("profiles", id);
         const p = { ...saved, ...profileSchema.parse(saved) };
+        trackTabs = p.restoreTabs;
+        let savedTabs;
+        if (p.restoreTabs)
+          try {
+            savedTabs = loadTabs(db, id, decryptTabs);
+          } catch {
+            sessionNotices.set(
+              id,
+              "อ่านแท็บที่บันทึกไว้ไม่ได้ จึงใช้ URL เริ่มต้นแทน",
+            );
+          }
         engine = p.engine;
         const executablePath = executable(engine);
         if (p.vpnName) {
@@ -211,7 +252,10 @@ app.whenReady().then(async () => {
               : [],
         });
         live.set(id, ctx);
-        ctx.on("close", () => live.delete(id));
+        ctx.on("close", () => {
+          live.delete(id);
+          tabTrackers.delete(id);
+        });
         const origins = new Set([
           "https://www.facebook.com",
           ...startupUrls(p.startUrls).map((url) => new URL(url).origin),
@@ -223,20 +267,42 @@ app.whenReady().then(async () => {
               { origin },
             );
         stage = "navigation";
-        const pages = startupUrls(p.startUrls);
-        const first = ctx.pages()[0] || (await ctx.newPage());
-        await first.goto(pages[0]!, { waitUntil: "domcontentloaded" });
-        for (const url of pages.slice(1))
-          await (
-            await ctx.newPage()
-          ).goto(url, { waitUntil: "domcontentloaded" });
-        const realEnvironment = await first.evaluate(() => ({
-          userAgent: navigator.userAgent,
-          language: navigator.language,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          screenWidth: screen.width,
-          screenHeight: screen.height,
-        }));
+        const nativeTabs = tabSnapshot(ctx.pages().map((page) => page.url()));
+        const targets =
+          p.restoreTabs && savedTabs?.urls.length
+            ? savedTabs
+            : p.restoreTabs && nativeTabs.urls.length
+              ? nativeTabs
+              : { urls: startupUrls(p.startUrls), activeIndex: 0 };
+        const result = await restoreTabs(
+          ctx,
+          targets.urls,
+          targets.activeIndex,
+        );
+        if (p.restoreTabs) {
+          const tracker = new TabTracker(
+            ctx,
+            (snapshot) => saveTabs(db, id, snapshot, encryptTabs),
+            (message) => sessionNotices.set(id, message),
+          );
+          tabTrackers.set(id, tracker);
+          await tracker.flush();
+        }
+        if (result.failed)
+          sessionNotices.set(
+            id,
+            "บางแท็บโหลดไม่สำเร็จ แต่เบราว์เซอร์ยังเปิดอยู่ คุณสามารถตรวจเครือข่ายและดำเนินการในหน้าต่างนั้นต่อได้",
+          );
+        const first = ctx.pages()[0];
+        const realEnvironment = await first
+          ?.evaluate(() => ({
+            userAgent: navigator.userAgent,
+            language: navigator.language,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            screenWidth: screen.width,
+            screenHeight: screen.height,
+          }))
+          .catch(() => undefined);
         put("profiles", id, {
           ...p,
           lastOpened: new Date().toISOString(),
@@ -244,8 +310,25 @@ app.whenReady().then(async () => {
           os: process.platform,
           realEnvironment,
         });
-        return { version: ctx.browser()?.version() };
+        return {
+          version: ctx.browser()?.version(),
+          warning: sessionNotices.get(id),
+        };
       } catch (error) {
+        if (stage === "navigation" && ctx && live.has(id)) {
+          const warning = launchFailure(stage, engine, error);
+          sessionNotices.set(id, warning);
+          if (trackTabs && !tabTrackers.has(id)) {
+            const tracker = new TabTracker(
+              ctx,
+              (snapshot) => saveTabs(db, id, snapshot, encryptTabs),
+              (message) => sessionNotices.set(id, message),
+            );
+            tabTrackers.set(id, tracker);
+            await tracker.flush();
+          }
+          return { warning };
+        }
         await ctx?.close();
         throw Error(launchFailure(stage, engine, error));
       } finally {
@@ -452,6 +535,19 @@ app.whenReady().then(async () => {
   });
   if (smoke) {
     try {
+      const probeId = randomUUID();
+      const probe = {
+        version: 1 as const,
+        urls: ["https://www.facebook.com/"],
+        activeIndex: 0,
+      };
+      saveTabs(db, probeId, probe, encryptTabs);
+      if (
+        JSON.stringify(loadTabs(db, probeId, decryptTabs)) !==
+        JSON.stringify(probe)
+      )
+        throw Error("Encrypted tab storage roundtrip failed");
+      db.prepare("DELETE FROM profile_tabs WHERE profile_id=?").run(probeId);
       const engines: Engine[] = [
         "chromium",
         "firefox",
@@ -496,8 +592,13 @@ app.whenReady().then(async () => {
   }
   win.loadFile(path.join(here, "../dist/index.html"));
 });
-app.on("window-all-closed", () => {
-  void Promise.all([...live.values()].map((c) => c.close())).finally(() =>
+let quitting = false;
+app.on("before-quit", (event) => {
+  if (quitting) return;
+  event.preventDefault();
+  quitting = true;
+  void Promise.all([...live.keys()].map(closeProfile)).finally(() =>
     app.quit(),
   );
 });
+app.on("window-all-closed", () => app.quit());

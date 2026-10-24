@@ -63,7 +63,7 @@ test("SQLite migration is repeatable and profile CRUD persists", () => {
   const db = openDatabase(":memory:");
   assert.equal(
     (db.prepare("PRAGMA user_version").get() as any).user_version,
-    1,
+    2,
   );
   db.prepare("INSERT INTO profiles VALUES (?,?)").run(
     "one",

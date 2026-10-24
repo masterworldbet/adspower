@@ -68,6 +68,10 @@ test("tabbed editor validates and saves settings with a synchronized summary", a
     await page
       .getByRole("button", { name: "⤨ สุ่ม Proxy ตอนนี้", exact: true })
       .click();
+    await page.getByRole("tab", { name: "ขั้นสูง", exact: true }).click();
+    await page
+      .getByLabel("บันทึกและคืนแท็บล่าสุดเมื่อเปิดโปรไฟล์", { exact: true })
+      .uncheck();
     await page.getByRole("tab", { name: "ทั่วไป", exact: true }).click();
     await page.getByRole("button", { name: "iPhone", exact: true }).click();
     assert.ok(
@@ -102,6 +106,7 @@ test("tabbed editor validates and saves settings with a synchronized summary", a
         (await (window as any).masterbrowser.invoke("list")).value.profiles[0],
     );
     assert.equal(saved.deviceMode, "android");
+    assert.equal(saved.restoreTabs, false);
     assert.equal(saved.width, 393);
     assert.equal(saved.screenHeight, 851);
     assert.equal(saved.colorScheme, "dark");

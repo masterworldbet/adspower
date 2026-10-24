@@ -19,7 +19,7 @@ test("migration survives reopening and preserves saved data", () => {
     assert.equal(db.prepare("SELECT * FROM profiles").all().length, 1);
     assert.equal(
       (db.prepare("PRAGMA user_version").get() as any).user_version,
-      1,
+      2,
     );
     db.close();
   } finally {
@@ -31,15 +31,39 @@ test("older application refuses to downgrade a future database", () => {
   const file = path.join(dir, "db.sqlite");
   try {
     const db = new DatabaseSync(file);
-    db.exec("PRAGMA user_version=2");
+    db.exec("PRAGMA user_version=3");
     db.close();
     assert.throws(() => openDatabase(file), /รุ่นใหม่กว่า/);
     const verify = new DatabaseSync(file);
     assert.equal(
       (verify.prepare("PRAGMA user_version").get() as any).user_version,
-      2,
+      3,
     );
     verify.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test("version one migration preserves profiles and adds separate tab records", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "masterbrowser-migrate-"));
+  const file = path.join(dir, "db.sqlite");
+  try {
+    const old = new DatabaseSync(file);
+    old.exec(
+      "CREATE TABLE profiles(id TEXT PRIMARY KEY,data TEXT NOT NULL); CREATE TABLE proxies(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=1;",
+    );
+    old
+      .prepare("INSERT INTO profiles VALUES (?,?)")
+      .run("existing", '{"name":"Original"}');
+    old.close();
+    const db = openDatabase(file);
+    assert.equal(db.prepare("SELECT * FROM profiles").all().length, 1);
+    assert.equal(db.prepare("SELECT * FROM profile_tabs").all().length, 0);
+    assert.equal(
+      (db.prepare("PRAGMA user_version").get() as any).user_version,
+      2,
+    );
+    db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
