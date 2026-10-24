@@ -1,5 +1,7 @@
+import { devicePresets, type DeviceMode } from "./device-presets.js";
 import type { BrowserContextOptions } from "playwright";
 export type EnvironmentSettings = {
+  deviceMode?: DeviceMode;
   locale: string;
   timezone: string;
   width: number;
@@ -17,6 +19,9 @@ export function environmentOptions(
   p: EnvironmentSettings,
 ): BrowserContextOptions {
   return {
+    isMobile: !!p.deviceMode && p.deviceMode !== "desktop",
+    hasTouch: !!p.deviceMode && p.deviceMode !== "desktop",
+    deviceScaleFactor: devicePresets[p.deviceMode ?? "desktop"].scale,
     locale: p.locale,
     timezoneId: p.timezone,
     viewport: { width: p.width, height: p.height },

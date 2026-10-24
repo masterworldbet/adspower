@@ -94,3 +94,27 @@ test("unsupported Firefox WebRTC policy is rejected rather than pretending to ap
     false,
   );
 });
+test("mobile presets enable actual viewport, touch and pixel ratio without a Safari UA override", () => {
+  for (const deviceMode of ["android", "iphone"] as const) {
+    const p = profileSchema.parse({
+      ...base,
+      deviceMode,
+      width: 390,
+      height: 844,
+    });
+    const options = environmentOptions(p);
+    assert.equal(options.isMobile, true);
+    assert.equal(options.hasTouch, true);
+    assert.ok(options.deviceScaleFactor! > 1);
+    assert.equal(options.userAgent, undefined);
+  }
+  assert.equal(
+    profileSchema.safeParse({
+      ...base,
+      deviceMode: "iphone",
+      engine: "firefox",
+    }).success,
+    false,
+  );
+  assert.equal(profileSchema.parse(base).deviceMode, "desktop");
+});

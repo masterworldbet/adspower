@@ -2,6 +2,7 @@ import { z } from "zod";
 export const profileSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
+    deviceMode: z.enum(["desktop", "android", "iphone"]).default("desktop"),
     engine: z.enum(["chromium", "chrome", "msedge", "firefox"]),
     locale: z.string().regex(/^[a-z]{2}(-[A-Z]{2})?$/),
     timezone: z.string().refine((v) => {
@@ -12,7 +13,7 @@ export const profileSchema = z
         return false;
       }
     }),
-    width: z.number().int().min(640).max(7680),
+    width: z.number().int().min(320).max(7680),
     height: z.number().int().min(480).max(4320),
     notes: z.string().max(4000),
     tags: z.string().max(500),
@@ -21,7 +22,7 @@ export const profileSchema = z
     randomProxy: z.boolean(),
     vpnName: z.string().max(200).default(""),
     accountLabel: z.string().max(200).default(""),
-    screenWidth: z.number().int().min(640).max(7680).optional(),
+    screenWidth: z.number().int().min(320).max(7680).optional(),
     screenHeight: z.number().int().min(480).max(4320).optional(),
     colorScheme: z.enum(["system", "light", "dark"]).default("system"),
     locationMode: z.enum(["ask", "block", "custom"]).default("ask"),
@@ -55,6 +56,18 @@ export const profileSchema = z
       .default(["https://www.facebook.com/"]),
   })
   .superRefine((p, ctx) => {
+    if (p.deviceMode === "desktop" && p.width < 640)
+      ctx.addIssue({
+        code: "custom",
+        path: ["width"],
+        message: "Desktop ต้องกว้างอย่างน้อย 640px",
+      });
+    if (p.deviceMode !== "desktop" && p.engine === "firefox")
+      ctx.addIssue({
+        code: "custom",
+        path: ["deviceMode"],
+        message: "Mobile Emulation รองรับ Chromium / Chrome / Edge เท่านั้น",
+      });
     if ((p.screenWidth ?? p.width) < p.width)
       ctx.addIssue({
         code: "custom",

@@ -154,3 +154,23 @@ npm run test:ui
 ```
 
 Windows CI รันทดสอบ Browser และ UI ทั้ง Chromium/Firefox ก่อนเผยแพร่ไฟล์รุ่นใหม่
+
+## รุ่น 0.5.0 — Desktop / Android / iPhone
+
+![Mobile emulation settings](docs/mobile-emulation.png)
+
+เลือกโหมดอุปกรณ์ในแท็บทั่วไปแยกแต่ละโปรไฟล์:
+
+- Desktop: หน้าต่างปกติ ไม่มี Touch emulation
+- Android: Mobile Emulation 393×851, Touch, Pixel ratio 2.75
+- iPhone: Mobile Emulation 390×844, Touch, Pixel ratio 3
+
+โหมดมือถือใช้ Chromium / Chrome / Edge ส่วน Firefox รองรับเฉพาะ Desktop UI และ backend ตรวจข้อจำกัดนี้ตรงกัน ไม่มีการสลับ Engine โดยไม่แสดงให้ทราบ
+
+โหมดนี้จำลอง viewport, touch, mobile layout และความหนาแน่นพิกเซลเท่านั้น ใช้ User-Agent และ Engine จริง ไม่อ้างว่า Windows เปลี่ยนเป็น Android/iOS หรือ Chrome เปลี่ยนเป็น Safari บางเว็บที่เลือกหน้าเว็บจาก User-Agent อาจยังให้หน้า Desktop ได้แม้หน้าจอเป็น Mobile สามารถตั้ง URL เริ่มต้นเป็น https://m.facebook.com/ ได้ตามการรองรับของเว็บไซต์
+
+ทดสอบ Chromium จริงทั้งสองโหมด: viewport, screen, devicePixelRatio, touch points และการ tap ปุ่ม พร้อมยืนยันว่าไม่ได้ใช้ User-Agent ปลอมของ Android/iPhone อีกทั้ง UI test ตรวจการเลือกและบันทึกโหมด Android/iPhone สำเร็จ โปรไฟล์เก่าจะมี deviceMode=desktop โดยอัตโนมัติ
+
+### ขอบเขต VPN
+
+MasterBrowser สุ่มเลือกและสั่งเชื่อมต่อ Windows VPN ที่ผู้ใช้ตั้งไว้ได้ แต่เส้นทางเครือข่ายของ VPN แบบนี้มีผลกับทั้งเครื่อง ส่วนการสุ่ม Proxy แยกโปรไฟล์รองรับอยู่แล้ว การแยก VPN จริงคนละตัวต่อโปรไฟล์ทำได้ทางเทคนิคด้วยระบบแยก routing เพิ่มเติม ซึ่งแอปยังไม่ได้พัฒนาส่วนนั้น ข้อจำกัดนี้ไม่ได้หมายความว่าโปรแกรมอื่นไม่สามารถทำได้

@@ -69,6 +69,15 @@ test("tabbed editor validates and saves settings with a synchronized summary", a
       .getByRole("button", { name: "⤨ สุ่ม Proxy ตอนนี้", exact: true })
       .click();
     await page.getByRole("tab", { name: "ทั่วไป", exact: true }).click();
+    await page.getByRole("button", { name: "iPhone", exact: true }).click();
+    assert.ok(
+      (await page.locator(".profile-summary").innerText()).includes("iPhone"),
+    );
+    await page.getByRole("button", { name: "Android", exact: true }).click();
+    assert.ok(
+      (await page.locator(".profile-summary").innerText()).includes("Android"),
+    );
+
     if (process.env.UI_SCREENSHOT_DIR) {
       await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
       await page.screenshot({
@@ -92,8 +101,9 @@ test("tabbed editor validates and saves settings with a synchronized summary", a
       async () =>
         (await (window as any).masterbrowser.invoke("list")).value.profiles[0],
     );
-    assert.equal(saved.width, 1920);
-    assert.equal(saved.screenHeight, 1080);
+    assert.equal(saved.deviceMode, "android");
+    assert.equal(saved.width, 393);
+    assert.equal(saved.screenHeight, 851);
     assert.equal(saved.colorScheme, "dark");
     assert.equal(saved.latitude, 13.75);
     assert.equal(saved.startUrls.length, 2);

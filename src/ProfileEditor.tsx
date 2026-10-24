@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { devicePresets, type DeviceMode } from "../electron/device-presets.js";
 import { profileSchema } from "../electron/profile-schema.js";
 type Item = Record<string, any>;
 type Props = {
@@ -40,6 +41,7 @@ export function ProfileEditor({
           ? "Linux"
           : "OS จริงของเครื่อง";
   const [form, setForm] = useState<Item>({
+    deviceMode: "desktop",
     colorScheme: "system",
     locationMode: "ask",
     accuracy: 100,
@@ -210,6 +212,15 @@ export function ProfileEditor({
                       setForm({
                         ...form,
                         engine: e.target.value,
+                        ...(e.target.value === "firefox"
+                          ? {
+                              deviceMode: "desktop",
+                              width: 1280,
+                              height: 800,
+                              screenWidth: 1280,
+                              screenHeight: 800,
+                            }
+                          : {}),
                         webrtcPolicy:
                           e.target.value === "firefox"
                             ? "default"
@@ -218,7 +229,13 @@ export function ProfileEditor({
                     }
                   >
                     {Object.entries(engineNames).map(([engine, name]) => (
-                      <option key={engine} value={engine}>
+                      <option
+                        key={engine}
+                        value={engine}
+                        disabled={
+                          engine === "firefox" && form.deviceMode !== "desktop"
+                        }
+                      >
                         {name}
                         {browsers.find((b) => b.engine === engine)
                           ?.available === false
@@ -239,6 +256,47 @@ export function ProfileEditor({
                       : browser.reason}
                   </p>
                 )}
+                <div className="setting-row">
+                  <span>โหมดอุปกรณ์</span>
+                  <div>
+                    <div className="segments">
+                      {Object.entries(devicePresets).map(([mode, preset]) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          disabled={
+                            mode !== "desktop" && form.engine === "firefox"
+                          }
+                          aria-pressed={form.deviceMode === mode}
+                          className={form.deviceMode === mode ? "active" : ""}
+                          onClick={() =>
+                            setForm({
+                              ...form,
+                              deviceMode: mode,
+                              engine: form.engine,
+                              width: preset.width,
+                              height: preset.height,
+                              screenWidth: preset.width,
+                              screenHeight: preset.height,
+                            })
+                          }
+                        >
+                          {mode === "desktop"
+                            ? "Desktop"
+                            : mode === "android"
+                              ? "Android"
+                              : "iPhone"}
+                        </button>
+                      ))}
+                    </div>
+                    <small>
+                      Android / iPhone เป็น Mobile Emulation:
+                      จำลองขนาดจอและสัมผัส ใช้ Engine, OS และ User-Agent จริง
+                      ไม่ใช่ Android, iOS หรือ Safari จริง · Mobile ใช้กับ
+                      Chromium / Chrome / Edge ส่วน Firefox รองรับ Desktop
+                    </small>
+                  </div>
+                </div>
                 <div className="setting-row">
                   <span>ระบบปฏิบัติการ</span>
                   <div className="readonly-value">
@@ -464,7 +522,7 @@ export function ProfileEditor({
                   </div>
                 </div>
                 {field("width", "Viewport กว้าง", "number", {
-                  min: 640,
+                  min: form.deviceMode === "desktop" ? 640 : 320,
                   max: 7680,
                 })}
                 {field("height", "Viewport สูง", "number", {
@@ -572,6 +630,14 @@ export function ProfileEditor({
               {[
                 ["ชื่อ", form.name || "ยังไม่ได้ตั้งชื่อ"],
                 ["เบราว์เซอร์", engineNames[form.engine]],
+                [
+                  "โหมดอุปกรณ์",
+                  devicePresets[form.deviceMode as DeviceMode].name,
+                ],
+                [
+                  "Pixel ratio",
+                  String(devicePresets[form.deviceMode as DeviceMode].scale),
+                ],
                 ["ระบบปฏิบัติการ", "ค่าจริงของเครื่อง"],
                 ["บัญชี", form.accountLabel || "ไม่ได้ระบุ"],
                 [

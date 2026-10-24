@@ -125,3 +125,52 @@ test(`${engine.name()} persistent browser profiles isolate cookies and local sto
     }
   }
 });
+import { devicePresets } from "../electron/device-presets.js";
+for (const mode of ["android", "iphone"] as const) {
+  test(
+    `${mode} mobile emulation applies touch, screen and scale with the real Chromium UA`,
+    {
+      skip:
+        engine.name() === "firefox"
+          ? "Mobile mode is explicitly unsupported on Firefox"
+          : false,
+    },
+    async () => {
+      const browser = await chromium.launch({ headless: true });
+      try {
+        const preset = devicePresets[mode];
+        const context = await browser.newContext(
+          environmentOptions({
+            deviceMode: mode,
+            locale: "th-TH",
+            timezone: "Asia/Bangkok",
+            width: preset.width,
+            height: preset.height,
+          }),
+        );
+        const page = await context.newPage();
+        await page.setContent(
+          '<meta name="viewport" content="width=device-width,initial-scale=1"><button onclick="this.textContent=\'tapped\'">tap</button>',
+        );
+        const metrics = await page.evaluate(() => ({
+          width: innerWidth,
+          screen: screen.width,
+          ratio: devicePixelRatio,
+          touch: navigator.maxTouchPoints,
+          ua: navigator.userAgent,
+        }));
+        assert.equal(metrics.width, preset.width);
+        assert.equal(metrics.screen, preset.width);
+        assert.equal(metrics.ratio, preset.scale);
+        assert.ok(metrics.touch > 0);
+        assert.ok(!metrics.ua.includes("iPhone"));
+        assert.ok(!metrics.ua.includes("Android"));
+        await page.getByRole("button", { name: "tap", exact: true }).tap();
+        assert.equal(await page.getByRole("button").textContent(), "tapped");
+        await context.close();
+      } finally {
+        await browser.close();
+      }
+    },
+  );
+}
