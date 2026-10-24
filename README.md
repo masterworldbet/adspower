@@ -32,7 +32,7 @@ npm run package:portable
 - สร้าง แก้ไข ลบ ทำสำเนาการตั้งค่าโปรไฟล์ พร้อมกลุ่ม แท็ก หมายเหตุ
 - แยก userDataDir ด้วย UUID ป้องกันเปิดซ้ำระหว่างกำลังเปิดและขณะทำงาน ปิด Browser ได้จาก UI
 - เลือก Chromium / Chrome / Edge / Firefox เปิดหน้าต่างจริงและไป Facebook
-- Locale, Timezone, Viewport และ Screen ตามค่าที่กำหนด ใช้ User-Agent จริง ไม่ปลอม Fingerprint หรือ OS
+- Locale, Timezone, Viewport และ Screen ตามค่าที่กำหนด Desktop ใช้ User-Agent จริง ส่วน Mobile ตั้งแต่รุ่น 0.7 ใช้ Mobile User-Agent สำหรับ web emulation ตามเวอร์ชัน Engine ไม่เปลี่ยน OS หรือฮาร์ดแวร์จริง และไม่ซ่อนการตรวจสอบของเว็บไซต์
 - Proxy HTTP / HTTPS / SOCKS5, Import URL หนึ่งบรรทัดต่อรายการ ข้ามรายการซ้ำ ตรวจรูปแบบและพอร์ต
 - ไม่รองรับ SOCKS5 authentication; ข้อมูลรับรองใช้ Electron safeStorage (Windows DPAPI) ไม่ส่งกลับ Renderer
 - ทดสอบ Public IP และ Latency ผ่าน Proxy; สุ่มเฉพาะรายการสถานะ available ก่อนเปิดและทดสอบซ้ำก่อนเริ่ม Browser ไม่เปลี่ยน Proxy ระหว่าง Session
