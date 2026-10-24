@@ -191,7 +191,7 @@ MasterBrowser สุ่มเลือกและสั่งเชื่อม
 
 อัปเกรด SQLite จาก schema 1 เป็น 2 โดยคง profiles/proxies เดิมไว้ แอปรุ่นเก่าที่รองรับ schema 1 จะไม่สามารถเปิดฐานข้อมูลที่อัปเกรดแล้วได้
 
-ผ่าน Unit Tests 26 รายการ และ Chromium/Firefox จริง: เปิดหลายแท็บ ปิดบางแท็บ เพิ่มแท็บใหม่ บันทึกและเปิด Browser ใหม่ ตรวจ URL ที่คืนโดยไม่ซ้ำ Cookies/Local Storage เดิมยังอยู่ และกรณีหน้าโหลดล้มเหลวไม่ปิด Browser Windows packaged smoke test ตรวจ safeStorage roundtrip ของรายการแท็บด้วย
+ผ่าน Unit Tests 27 รายการ และ Chromium/Firefox จริง: เปิดหลายแท็บ ปิดบางแท็บ เพิ่มแท็บใหม่ บันทึกและเปิด Browser ใหม่ ตรวจ URL ที่คืนโดยไม่ซ้ำ Cookies/Local Storage เดิมยังอยู่ และกรณีหน้าโหลดล้มเหลวไม่ปิด Browser Windows packaged smoke test ตรวจ safeStorage roundtrip ของรายการแท็บด้วย
 
 ### การยืนยันของ Meta
 

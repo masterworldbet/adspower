@@ -60,3 +60,29 @@ test("tab records remain per profile, encoded through the supplied storage codec
     db.close();
   }
 });
+import { EventEmitter } from "node:events";
+import type { BrowserContext } from "playwright";
+import { TabTracker } from "../electron/tabs.js";
+test("overlapping tab flush requests are serialized before closing", async () => {
+  let active = 0,
+    maximum = 0;
+  const page = new EventEmitter() as any;
+  page.isClosed = () => false;
+  page.url = () => "https://example.org/";
+  page.evaluate = async () => {
+    active++;
+    maximum = Math.max(maximum, active);
+    await new Promise((r) => setTimeout(r, 5));
+    active--;
+    return true;
+  };
+  const context = new EventEmitter() as any;
+  context.pages = () => [page];
+  const tracker = new TabTracker(context as BrowserContext, () => {});
+  try {
+    await Promise.all([tracker.flush(), tracker.flush(), tracker.flush()]);
+    assert.equal(maximum, 1);
+  } finally {
+    tracker.stop();
+  }
+});

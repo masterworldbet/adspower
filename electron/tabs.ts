@@ -153,7 +153,7 @@ export class TabTracker {
     this.pending.unref();
   }
   async flush() {
-    if (this.writing) await this.writing;
+    while (this.writing) await this.writing;
     if (this.stopped) return;
     this.writing = (async () => {
       try {
