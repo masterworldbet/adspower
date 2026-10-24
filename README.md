@@ -196,3 +196,13 @@ MasterBrowser สุ่มเลือกและสั่งเชื่อม
 ### การยืนยันของ Meta
 
 แอปไม่มีระบบปิด/ข้าม CAPTCHA, ซ่อนการตรวจสอบ, แก้ challenge หรือส่งโจทย์ไปให้บริการแก้ CAPTCHA ผู้ใช้ต้องทำการยืนยันผ่าน Meta เอง การแก้การเก็บแท็บและการปิด Browser ไม่ใช่หลักฐานว่า CAPTCHA จะหายหรือทำให้การยืนยันบัญชีผ่านได้
+
+## รุ่น 0.7.0 — Mobile User-Agent สำหรับการเลือกหน้าเว็บมือถือ
+
+แก้ข้อจำกัดรุ่น 0.5/0.6 ที่ส่ง Desktop User-Agent แม้เลือกโหมดมือถือ รุ่นนี้โหมด Android และจอขนาด iPhone จะใช้ Chrome Mobile web emulation พร้อม User-Agent ที่มี Android/Mobile และเวอร์ชัน Chromium/Chrome/Edge ที่ตรวจพบจริงก่อนเปิดโปรไฟล์ Desktop ยังคงใช้ User-Agent เดิมของเบราว์เซอร์
+
+จอขนาด iPhone หมายถึง viewport/DPR ขนาด iPhone แต่ใช้ Chrome Mobile emulation ไม่ใช่ Safari หรือระบบ iOS จริง การจำลอง UA ไม่ได้เปลี่ยน Windows หรือฮาร์ดแวร์จริง
+
+ทดสอบบน Chromium จริงกับ HTTP server ที่เลือกหน้า Desktop/Mobile จาก User-Agent: ได้หน้า Mobile และตรวจ navigator.userAgent, User-Agent header, User-Agent Client Hints (mobile=true/platform=Android), viewport, pixel ratio และการ tap ค่า Desktop ไม่ถูกเปลี่ยน
+
+การทดสอบนี้เป็นเว็บทดสอบในเครื่อง ไม่ใช่การยืนยันผลกับบัญชี Facebook ของผู้ใช้ เว็บไซต์อาจเลือกหน้าเองตามการรองรับ Cookies และเงื่อนไขอื่น m.facebook.com อาจ redirect ไป URL อื่นได้ แอปไม่บังคับหรือดัดแปลง HTML ของ Facebook และไม่เพิ่มระบบปิด/ข้าม CAPTCHA หรือซ่อนการตรวจสอบของเว็บไซต์

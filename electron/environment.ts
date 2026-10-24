@@ -17,8 +17,12 @@ export type EnvironmentSettings = {
 };
 export function environmentOptions(
   p: EnvironmentSettings,
+  mobileAgent?: string,
 ): BrowserContextOptions {
   return {
+    ...(p.deviceMode && p.deviceMode !== "desktop" && mobileAgent
+      ? { userAgent: mobileAgent }
+      : {}),
     isMobile: !!p.deviceMode && p.deviceMode !== "desktop",
     hasTouch: !!p.deviceMode && p.deviceMode !== "desktop",
     deviceScaleFactor: devicePresets[p.deviceMode ?? "desktop"].scale,

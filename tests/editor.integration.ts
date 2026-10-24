@@ -73,7 +73,7 @@ test("tabbed editor validates and saves settings with a synchronized summary", a
       .getByLabel("บันทึกและคืนแท็บล่าสุดเมื่อเปิดโปรไฟล์", { exact: true })
       .uncheck();
     await page.getByRole("tab", { name: "ทั่วไป", exact: true }).click();
-    await page.getByRole("button", { name: "iPhone", exact: true }).click();
+    await page.getByRole("button", { name: "จอ iPhone", exact: true }).click();
     assert.ok(
       (await page.locator(".profile-summary").innerText()).includes("iPhone"),
     );

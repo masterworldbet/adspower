@@ -125,10 +125,11 @@ test(`${engine.name()} persistent browser profiles isolate cookies and local sto
     }
   }
 });
+import { mobileUserAgent } from "../electron/mobile-agent.js";
 import { devicePresets } from "../electron/device-presets.js";
 for (const mode of ["android", "iphone"] as const) {
   test(
-    `${mode} mobile emulation applies touch, screen and scale with the real Chromium UA`,
+    `${mode} mobile emulation serves the mobile page using a version-matched Mobile UA`,
     {
       skip:
         engine.name() === "firefox"
@@ -139,35 +140,61 @@ for (const mode of ["android", "iphone"] as const) {
       const browser = await chromium.launch({ headless: true });
       try {
         const preset = devicePresets[mode];
-        const context = await browser.newContext(
-          environmentOptions({
-            deviceMode: mode,
-            locale: "th-TH",
-            timezone: "Asia/Bangkok",
-            width: preset.width,
-            height: preset.height,
-          }),
-        );
-        const page = await context.newPage();
-        await page.setContent(
-          '<meta name="viewport" content="width=device-width,initial-scale=1"><button onclick="this.textContent=\'tapped\'">tap</button>',
-        );
-        const metrics = await page.evaluate(() => ({
-          width: innerWidth,
-          screen: screen.width,
-          ratio: devicePixelRatio,
-          touch: navigator.maxTouchPoints,
-          ua: navigator.userAgent,
-        }));
-        assert.equal(metrics.width, preset.width);
-        assert.equal(metrics.screen, preset.width);
-        assert.equal(metrics.ratio, preset.scale);
-        assert.ok(metrics.touch > 0);
-        assert.ok(!metrics.ua.includes("iPhone"));
-        assert.ok(!metrics.ua.includes("Android"));
-        await page.getByRole("button", { name: "tap", exact: true }).tap();
-        assert.equal(await page.getByRole("button").textContent(), "tapped");
-        await context.close();
+        const mobileAgent = mobileUserAgent("chromium", browser.version());
+        let receivedAgent = "";
+        const server = createServer((req, res) => {
+          receivedAgent = req.headers["user-agent"] || "";
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.end(
+            `<meta name="viewport" content="width=device-width,initial-scale=1"><title>${receivedAgent.includes("Android") && receivedAgent.includes("Mobile") ? "Mobile page" : "Desktop page"}</title><button onclick="this.textContent='tapped'">tap</button>`,
+          );
+        });
+        await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+        const address = server.address();
+        if (!address || typeof address === "string")
+          throw Error("No fixture port");
+        try {
+          const context = await browser.newContext(
+            environmentOptions(
+              {
+                deviceMode: mode,
+                locale: "th-TH",
+                timezone: "Asia/Bangkok",
+                width: preset.width,
+                height: preset.height,
+              },
+              mobileAgent,
+            ),
+          );
+          const page = await context.newPage();
+          await page.goto(`http://127.0.0.1:${address.port}`);
+          assert.equal(await page.title(), "Mobile page");
+          assert.equal(receivedAgent, mobileAgent);
+          const metrics = await page.evaluate(() => ({
+            width: innerWidth,
+            screen: screen.width,
+            ratio: devicePixelRatio,
+            touch: navigator.maxTouchPoints,
+            ua: navigator.userAgent,
+            hintMobile: (navigator as any).userAgentData?.mobile,
+            hintPlatform: (navigator as any).userAgentData?.platform,
+          }));
+          assert.equal(metrics.width, preset.width);
+          assert.equal(metrics.screen, preset.width);
+          assert.equal(metrics.ratio, preset.scale);
+          assert.ok(metrics.touch > 0);
+          assert.ok(!metrics.ua.includes("iPhone"));
+          assert.ok(metrics.ua.includes("Android"));
+          assert.equal(metrics.ua, mobileAgent);
+          assert.equal(metrics.hintMobile, true);
+          assert.equal(metrics.hintPlatform, "Android");
+          await page.getByRole("button", { name: "tap", exact: true }).tap();
+          assert.equal(await page.getByRole("button").textContent(), "tapped");
+          await context.close();
+        } finally {
+          server.closeAllConnections();
+          await new Promise<void>((r) => server.close(() => r()));
+        }
       } finally {
         await browser.close();
       }

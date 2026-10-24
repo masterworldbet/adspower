@@ -7,7 +7,7 @@ export const devicePresets = {
     scale: 2.75,
   },
   iphone: {
-    name: "iPhone · Mobile Emulation",
+    name: "จอขนาด iPhone · Chrome Mobile",
     width: 390,
     height: 844,
     scale: 3,

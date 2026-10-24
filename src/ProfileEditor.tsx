@@ -286,15 +286,16 @@ export function ProfileEditor({
                             ? "Desktop"
                             : mode === "android"
                               ? "Android"
-                              : "iPhone"}
+                              : "จอ iPhone"}
                         </button>
                       ))}
                     </div>
                     <small>
-                      Android / iPhone เป็น Mobile Emulation:
-                      จำลองขนาดจอและสัมผัส ใช้ Engine, OS และ User-Agent จริง
-                      ไม่ใช่ Android, iOS หรือ Safari จริง · Mobile ใช้กับ
-                      Chromium / Chrome / Edge ส่วน Firefox รองรับ Desktop
+                      โหมดมือถือส่ง Chrome Mobile User-Agent
+                      เพื่อขอหน้าเว็บมือถือ แต่ยังทำงานบน Windows จอขนาด iPhone
+                      ใช้ Chrome Mobile Emulation ไม่ใช่ Safari หรือ iOS จริง ·
+                      รองรับ Chromium / Chrome / Edge ส่วน Firefox รองรับ
+                      Desktop
                     </small>
                   </div>
                 </div>
@@ -308,10 +309,12 @@ export function ProfileEditor({
                 <div className="setting-row">
                   <span>User-Agent</span>
                   <div className="readonly-value">
-                    อัตโนมัติจากเบราว์เซอร์จริง
+                    {form.deviceMode === "desktop"
+                      ? "อัตโนมัติจากเบราว์เซอร์จริง"
+                      : "Mobile User-Agent ตามเวอร์ชัน Engine (Android web emulation)"}
                     <small>
-                      แสดงค่าที่วัดได้หลังเปิดโปรไฟล์ ไม่มีการใช้ UA ของ OS หรือ
-                      Engine อื่น
+                      แสดงค่าที่ตรวจวัดหลังเปิดโปรไฟล์ โหมดมือถือจำลอง Android
+                      web โดยไม่ใช้ UA ของ Safari กับ Chrome
                     </small>
                   </div>
                 </div>
@@ -692,7 +695,12 @@ export function ProfileEditor({
                     ? "จำกัด UDP นอก Proxy"
                     : "ค่าเบราว์เซอร์",
                 ],
-                ["User-Agent", "อัตโนมัติจากเบราว์เซอร์"],
+                [
+                  "User-Agent",
+                  form.deviceMode === "desktop"
+                    ? "อัตโนมัติจากเบราว์เซอร์"
+                    : "Chrome Mobile · Android emulation",
+                ],
                 [
                   "แท็บเมื่อเปิด",
                   form.restoreTabs ? "คืนแท็บล่าสุด" : "URL เริ่มต้น",

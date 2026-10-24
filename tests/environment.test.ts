@@ -118,3 +118,20 @@ test("mobile presets enable actual viewport, touch and pixel ratio without a Saf
   );
   assert.equal(profileSchema.parse(base).deviceMode, "desktop");
 });
+
+import { mobileUserAgent } from "../electron/mobile-agent.js";
+test("mobile UA is derived from the actual engine version and never affects desktop", () => {
+  const agent = mobileUserAgent("chromium", "156.0.8078.4");
+  assert.ok(agent.includes("Chrome/156.0.8078.4"));
+  assert.ok(agent.includes("Android"));
+  assert.ok(agent.includes(" Mobile "));
+  assert.equal(
+    environmentOptions({ ...base, deviceMode: "android" }, agent).userAgent,
+    agent,
+  );
+  assert.equal(
+    environmentOptions({ ...base, deviceMode: "desktop" }, agent).userAgent,
+    undefined,
+  );
+  assert.throws(() => mobileUserAgent("chrome", "invalid\nversion"));
+});

@@ -26,6 +26,7 @@ import {
   restoreTabs,
   tabSnapshot,
 } from "./tabs.js";
+import { mobileUserAgent } from "./mobile-agent.js";
 import { reserveProfile } from "./profile-lock.js";
 import { parseProxyList } from "./proxy-import.js";
 import { profileSchema, proxySchema, idSchema, chooseProxy } from "./schema.js";
@@ -239,13 +240,30 @@ app.whenReady().then(async () => {
           }
         }
         stage = "launch";
+        let mobileAgent: string | undefined;
+        if (p.deviceMode !== "desktop") {
+          const probe = await chromium.launch({
+            headless: true,
+            executablePath,
+            proxy: proxy ? proxyConfig(proxy) : undefined,
+            timeout: 20000,
+          });
+          try {
+            mobileAgent = mobileUserAgent(
+              p.engine as "chromium" | "chrome" | "msedge",
+              probe.version(),
+            );
+          } finally {
+            await probe.close();
+          }
+        }
         ctx = await (
           p.engine === "firefox" ? firefox : chromium
         ).launchPersistentContext(path.join(root, "sessions", id), {
           headless: false,
           executablePath,
           proxy: proxy ? proxyConfig(proxy) : undefined,
-          ...environmentOptions(p),
+          ...environmentOptions(p, mobileAgent),
           args:
             p.webrtcPolicy === "restrict_udp"
               ? ["--force-webrtc-ip-handling-policy=disable_non_proxied_udp"]
